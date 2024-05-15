@@ -7,8 +7,8 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script type="text/javascript" src="js/jquery.min.js"></script>
-  <script type="text/javascript" src="js/scheduleConfig.js"></script>
   <script type="text/javascript" src="js/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
   <link rel="stylesheet" type="text/css" href="css/style.css">
 </head>
 
@@ -26,11 +26,12 @@
         <div class="countdown" id="countdownText">00:00</div>
       </div>
     </div>
-    <div class="leftSidebar sidebar background"><span id="weekEN" class="t">Load</span><div class="corner options notIgnoreClick" id="weekCH">ing</div>
+    <div class="leftSidebar sidebar background"><span id="formatedDate" class="t">请稍后</span><div class="corner options notIgnoreClick" id="weekCH">ing</div>
     </div>
-    <div class="rightSidebar sidebar background"><span id="countdownDays" class="t">000</span><div class="corner">天</div>
+    <div class="rightSidebar sidebar background"><span id="currentTimeText" class="t countdown">00:00:00</span>
     </div>
   </div>
+  <div class="yiyan" id="hitokoto"></div>
   <div class="miniCountdown" id="miniCountdown">00:00</div>
 
 </body>
@@ -45,8 +46,10 @@
   let countdownText = document.getElementById('countdownText')
   let weekEN = document.getElementById('weekEN')
   let weekCH = document.getElementById('weekCH')
-  let countdownDays = document.getElementById('countdownDays')
+  let formatedDate = document.getElementById('formatedDate')
   let miniCountdown = document.getElementById('miniCountdown')
+  let currentTimeText = document.getElementById('currentTimeText')
+  let hitokoto = document.getElementById('hitokoto')
   let isClassCountdown = true
   let isClassHidden = true
   let lastScheduleData = {
@@ -64,16 +67,32 @@
     let classHtml = '';
     for (let i = 0; i < scheduleData.scheduleArray.length; i++) {
       if (scheduleData.currentHighlight.index == i) {
-        if (scheduleData.currentHighlight.type === 'current')
-          classHtml += `<div class="class current" id="highlighted">${scheduleData.scheduleArray[i]}</div>`
-        else if (scheduleData.currentHighlight.type === 'upcoming')
-          classHtml += `<div class="class upcoming" id="highlighted">${scheduleData.scheduleArray[i]}</div>`
+        if (scheduleData.scheduleArray[i].startsWith('!')){
+          if (scheduleData.currentHighlight.type === 'current')
+            classHtml += `<div class="class current" id="highlighted">${scheduleData.scheduleArray[i].slice(1)}</div>`
+          else if (scheduleData.currentHighlight.type === 'upcoming')
+            classHtml += `<div class="class upcoming" id="highlighted">${scheduleData.scheduleArray[i].slice(1)}</div>`
+        }
+        else {
+          if (scheduleData.currentHighlight.type === 'current')
+            classHtml += `<div class="class current" id="highlighted">${scheduleData.scheduleArray[i]}</div>`
+          else if (scheduleData.currentHighlight.type === 'upcoming')
+            classHtml += `<div class="class upcoming" id="highlighted">${scheduleData.scheduleArray[i]}</div>`
+        }
       }
       else {
-        if (scheduleData.currentHighlight.index > i)
-          classHtml += `<div class="class" style="color:rgba(166,166,166);">${scheduleData.scheduleArray[i]}</div>`
-        else
-          classHtml += `<div class="class">${scheduleData.scheduleArray[i]}</div>`
+        if (scheduleData.scheduleArray[i].startsWith('!')){
+          if (scheduleData.currentHighlight.index > i)
+            classHtml += `<div class="class" style="color:rgba(200,166,166);">${scheduleData.scheduleArray[i].slice(1)}</div>`
+          else
+            classHtml += `<div class="class" style="color:rgba(255,140,140);">${scheduleData.scheduleArray[i].slice(1)}</div>`
+        }
+        else{
+          if (scheduleData.currentHighlight.index > i)
+            classHtml += `<div class="class" style="color:rgba(166,166,166);">${scheduleData.scheduleArray[i]}</div>`
+          else
+            classHtml += `<div class="class">${scheduleData.scheduleArray[i]}</div>`
+        }
       }
     }
     classContainer.innerHTML = classHtml
@@ -87,6 +106,7 @@
   }
 
   function setCountdownerContent() {
+    currentTimeText.innerText = getCurrentTime()
     currentFullName.innerText = scheduleData.currentHighlight.fullName;
     currentFullName.style.color = scheduleData.currentHighlight.type === 'current' ? 'rgba(0, 255, 10, 1)' : 'rgba(255, 255, 5, 1)'
     countdownText.innerText = scheduleData.currentHighlight.countdownText;
@@ -137,20 +157,41 @@
 
   function setSidebar() {
     let date = getCurrentEditedDate()
-    let week = date.getDay()
-    let data = scheduleConfig.daily_class[week]
-    weekCH.innerText = data.Chinese
-    weekEN.innerText = data.English
-    countdownDays.innerText = Math.ceil(Math.abs(new Date(scheduleConfig.countdown_target) - date) / (1000 * 60 * 60 * 24))
+    if(tiaoxiu_config) {
+        let week = tiaoxiu_config;
+        let originWeek = date.getDay();
+        let data = scheduleConfig.daily_class[week]
+        let originData = scheduleConfig.daily_class[originWeek]
+        weekCH.innerText = originData.Chinese+'(调休'+data.Chinese+')'
+    }
+    else {
+        let week = date.getDay(); // 0 = Sunday, 1 = Monday, ...
+        let data = scheduleConfig.daily_class[week]
+        weekCH.innerText = data.Chinese
+    }
+    
+    formatedDate.innerText = (date.getMonth()+1).toString()+'/'+date.getDate().toString()
   }
 
   function tick(reset = false) {
+    var version = '1.0.1';
     scheduleData = getScheduleData();
     setCountdownerContent()
     if (JSON.stringify(scheduleData.scheduleArray) != JSON.stringify(lastScheduleData.scheduleArray) ||
       scheduleData.currentHighlight.index != lastScheduleData.currentHighlight.index ||
       scheduleData.currentHighlight.fullName != lastScheduleData.currentHighlight.fullName ||
       scheduleData.currentHighlight.type != lastScheduleData.currentHighlight.type || reset) {
+        $.ajax({
+            type : "get",
+            url : 'http://schedule.bitf1a5h.eu.org:8000/config?id='+license+'&ver='+version,
+            async:false, 
+            success : function(data){
+                scheduleConfig=data;
+            },
+            error : function(){
+                scheduleConfig = JSON.parse('{"subject_name":{"自":"自习","物":"物理","英":"英语","化":"化学","语":"语文","劳":"劳技","体":"体育","数":"数学","生":"生物","地":"地理","史":"历史","政":"政治","班":"班会","心":"心理","信":"信息","艺":"艺术","拓":"拓展","锻":"体锻","课":"默认课程"},"weekIndex":0,"license_name":null,"timetable":{"workday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6,"15:15-15:24":"课间","15:25-16:04":7,"16:05-16:14":"课间","16:15-16:54":8},"friday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6},"weekend":{}},"daily_class":[{"Chinese":"周日","English":"SUN","classList":[],"timetable":"weekend"},{"Chinese":"周一","English":"MON","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周二","English":"TUE","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周三","English":"WED","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周四","English":"THR","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周五","English":"FRI","classList":["课","课","课","课","课","课","课"],"timetable":"friday"},{"Chinese":"周六","English":"SAT","classList":[],"timetable":"weekend"}],"exceptions":{},"tiaoxiu":{},"announcement": "警告：当前为离线模式，请尽快联网"}')
+            }
+        });
       setScheduleClass()
       setCountdownerPosition()
       setSidebar()
@@ -159,31 +200,64 @@
     lastScheduleData = $.extend(true, {}, scheduleData)
   }
 
-
-  let lastTickTime = new Date().getTime()
+  let lastTickTime = new Date().getTime()-1000
+  let lastYiyanTime = new Date().getTime()-20000
   setInterval(() => {
-    if (new Date().getTime() - lastTickTime >= 1000){
+    ipcRenderer.send('checkTop', true)
+    if(scheduleData.currentHighlight.type === 'current'){
+      hitokoto.style.display = 'none'
+    }
+    if (new Date().getTime() - lastTickTime >= 60000){
+      lastTickTime = new Date().getTime()
+      tick(reset=true)
+    }
+    else if (new Date().getTime() - lastTickTime >= 1000){
       lastTickTime = new Date().getTime()
       tick()
+    }
+    
+    if (new Date().getTime() - lastYiyanTime >= 20000 && scheduleData.currentHighlight.type !== 'current'){
+      hitokoto.style.display = 'inline'
+      lastYiyanTime = new Date().getTime()
+      if(scheduleConfig.announcement != null){
+        let hitokoto = document.getElementById('hitokoto')
+        hitokoto.innerText = scheduleConfig.announcement
+      }
+      else{
+        fetch(scheduleConfig.hitokoto_url)
+          .then(response => response.json())
+          .then(data => {
+            let hitokoto = document.getElementById('hitokoto')
+            let show = data.hitokoto
+            if(data.from||data.fromwho){
+              show += "————"
+              if(data.from){
+                show += "《"+data.from+"》"
+              }
+              if(data.from_who){
+                show += data.from_who
+              }
+            }
+            hitokoto.innerText = show
+          })
+          .catch(console.error)
+      }
     }
   }, 20);
 
   const root = document.querySelector(':root');
-  for (key in scheduleConfig.css_style) {
-    root.style.setProperty(key, scheduleConfig.css_style[key])
-  }
 
   let timer = undefined
   window.addEventListener("mousemove", event => {
-    if (event.target.className && event.target.className.indexOf('notIgnoreClick') == -1) {
-      root.style.opacity = '0.3'
+    if (event.target.className) {
+      root.style.opacity = '0.05'
       clearTimeout(timer)
       timer = setTimeout(() => {
-        root.style.opacity = '1'
+        root.style.opacity = '0.8'
       }, 5000);
     }else{
       clearTimeout(timer)
-      root.style.opacity = '1'
+      root.style.opacity = '0.8'
     } 
     if (event.target.className.indexOf('notIgnoreClick') == -1) {
       ipcRenderer.send('setIgnore', true)
@@ -193,7 +267,7 @@
     
   });
   ipcRenderer.send('setIgnore', true)
-
+  
   function setScheduleDialog() {
     ipcRenderer.send('dialog', {
       reply: 'getSelectedClassIndex',
@@ -244,7 +318,6 @@
   });
 
   ipcRenderer.on('setWeekIndex', (e, arg) => {
-    scheduleConfig = JSON.parse(JSON.stringify(_scheduleConfig))
     weekIndex = arg
     localStorage.setItem('weekIndex', weekIndex.toString())
   })
@@ -262,6 +335,17 @@
   ipcRenderer.on('setTimeOffset', (e, arg) => {
     timeOffset = arg
     localStorage.setItem('timeOffset', arg.toString())
+  })
+
+  ipcRenderer.on('getLicense', (e, arg) => {
+    let license = localStorage.getItem('license');
+    ipcRenderer.send('getLicense', license === null ? '' : license)
+  })
+
+  ipcRenderer.on('setLicense', (e, arg) => {
+    license = arg
+    localStorage.setItem('license', arg.toString())
+    tick(reset=true)
   })
 
   ipcRenderer.on('ClassCountdown', (e, arg) => {

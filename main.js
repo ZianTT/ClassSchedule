@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, screen, Tray, shell } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog, screen, Tray, shell, net } = require('electron')
 const path = require('path');
 const fs = require('fs')
 const os = require('os')
@@ -12,7 +12,7 @@ let tray = undefined;
 let form = undefined;
 var win = undefined;
 let template = []
-let basePath = app.isPackaged ? './resources/app/' : './'
+let basePath = app.isPackaged ? './resources/app.asar/' : './'
 const createWindow = () => {
     win = new BrowserWindow({
         x: 0,
@@ -33,13 +33,14 @@ const createWindow = () => {
             enableRemoteModule: true
         },
     })
-    // win.webContents.openDevTools()
     win.loadFile('index.html')
+    if(!app.isPackaged)
+        win.webContents.openDevTools()
     if (store.get('isWindowAlwaysOnTop', true))
         win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
 }
 function setAutoLaunch() {
-    const shortcutName = '电子课表(请勿重命名).lnk'
+    const shortcutName = '电子课表.lnk'
     app.setLoginItemSettings({ // backward compatible
         openAtLogin: false,
         openAsHidden: false
@@ -70,48 +71,35 @@ ipcMain.on('getWeekIndex', (e, arg) => {
     tray = new Tray(basePath + 'image/icon.png')
     template = [
         {
-            label: '第一周',
-            type: 'radio',
+            label: '激活授权',
             click: () => {
-                win.webContents.send('setWeekIndex', 0)
+                win.webContents.send('getLicense')
             }
         },
         {
-            label: '第二周',
-            type: 'radio',
+            label: '关于',
             click: () => {
-                win.webContents.send('setWeekIndex', 1)
+                dialog.showMessageBox(win, {
+                    title: '授权信息',
+                    message: 'v0.1.1 测试版本不稳定，升级请联系作者\n\nBy ZianTT\nOriginal Author: EnderWolf006\nOriginal Project Link: https://github.com/EnderWolf006/ElectronClassSchedule\nLicense: GPL-3.0\n\n本程序授权给：'+store.get('licenseName', '未授权'),
+                    buttons: ['确定']
+                })
             }
         },
         {
-            label: '第三周',
-            type: 'radio',
+            label: '调试',
             click: () => {
-                win.webContents.send('setWeekIndex', 2)
+                win.webContents.openDevTools()
             }
         },
         {
             type: 'separator'
         },
         {
-            icon: basePath + 'image/setting.png',
-            label: '配置课表',
-            click: () => {
-                win.webContents.send('openSettingDialog')
-            }
-        },
-        {
             icon: basePath + 'image/clock.png',
             label: '矫正计时',
             click: () => {
                 win.webContents.send('getTimeOffset')
-            }
-        },
-        {
-            icon: basePath + 'image/github.png',
-            label: '源码仓库',
-            click: () => {
-                shell.openExternal('https://github.com/EnderWolf006/ElectronClassSchedule');
             }
         },
         {
@@ -176,7 +164,7 @@ ipcMain.on('getWeekIndex', (e, arg) => {
     ]
     template[arg].checked = true
     form = Menu.buildFromTemplate(template)
-    tray.setToolTip('电子课表 - by lsl')
+    tray.setToolTip('电子课表 - by ZianTT')
     function trayClicked() {
         tray.popUpContextMenu(form)
     }
@@ -227,4 +215,61 @@ ipcMain.on('getTimeOffset', (e, arg) => {
             win.webContents.send('setTimeOffset', Number(r) % 10000000000000)
         }
     })
+})
+
+ipcMain.on('getLicense', (e, arg) => {
+    prompt({
+        title: '授权信息',
+        label: '请输入授权码:',
+        value: store.get('license', ''),
+        inputAttrs: {
+            type: 'text'
+        },
+        type: 'input',
+        height: 180,
+        width: 400,
+    }).then(async (r) => {
+        if (r === null) {
+            console.log('[getLicense] User cancelled');
+        } else {
+            store.set('license', r)
+            response = await net.fetch('http://schedule.bitf1a5h.eu.org:8000/config?id=' + r)
+            if (response.ok) {
+                resp = await response.json()
+                licenseName = resp.license_name
+                if (licenseName === null) {
+                    dialog.showMessageBox(win, {
+                        title: '激活失败',
+                        message: '激活码错误',
+                        buttons: ['确定']
+                    })
+                    store.set('licenseName', '未授权')
+                }
+                else {
+                    dialog.showMessageBox(win, {
+                        title: '激活成功',
+                        message: '授权给：' + licenseName,
+                        buttons: ['确定']
+                    }).then(()=>{
+                        win.webContents.send('setLicense', r)
+                    })
+                    store.set('licenseName', licenseName)
+                }
+            }
+            else {
+                dialog.showMessageBox(win, {
+                    title: '激活失败',
+                    message: '网络错误',
+                    buttons: ['确定']
+                })
+            }
+            
+            
+        }
+    })
+})
+
+ipcMain.on('checkTop', (e, arg) => {
+    if (store.get('isWindowAlwaysOnTop', true) && win.isAlwaysOnTop() === false)
+        win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
 })
