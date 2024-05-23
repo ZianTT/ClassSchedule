@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, screen, Tray, shell, net } = require('electron')
+if(require('electron-squirrel-startup')) return;
+const { app, BrowserWindow, Menu, ipcMain, dialog, screen, Tray, shell, net, autoUpdater } = require('electron')
 const path = require('path');
 const fs = require('fs')
 const os = require('os')
@@ -8,11 +9,21 @@ const prompt = require('electron-prompt');
 const Store = require('electron-store');
 const { DisableMinimize } = require('electron-disable-minimize');
 const store = new Store();
+
+import * as Sentry from "@sentry/electron";
+
+Sentry.init({
+  dsn: "https://11ed10917af88c3c5fea9733e23d5dcb@o4504797893951488.ingest.us.sentry.io/4507306374070272",
+});
+
 let tray = undefined;
 let form = undefined;
 var win = undefined;
 let template = []
 let basePath = app.isPackaged ? './resources/app.asar/' : './'
+try {
+    require('electron-reloader')(module,{});
+    } catch (_) {}
 const createWindow = () => {
     win = new BrowserWindow({
         x: 0,
@@ -21,7 +32,7 @@ const createWindow = () => {
         height: 200,
         frame: false,
         transparent: true,
-        alwaysOnTop: store.get('isWindowAlwaysOnTop', true),
+        //alwaysOnTop: store.get('isWindowAlwaysOnTop', true),
         minimizable: false,
         maximizable: false,
         autoHideMenuBar: true,
@@ -33,9 +44,31 @@ const createWindow = () => {
             enableRemoteModule: true
         },
     })
+    if(!app.isPackaged) {
+        win.webContents.openDevTools({mode: 'detach'})
+    }
+    else {
+        autoUpdater.setFeedURL({
+            "provider": "generic",
+            "url": "http://schedule.bitf1a5h.eu.org:8000/api/update"
+        })
+        autoUpdater.checkForUpdates()
+        autoUpdater.on('error', (info) => {
+            console.error('更新错误', info);
+        });
+        autoUpdater.on('update-available', (info) => {
+            console.log('有新版本需要更新');
+        });
+        autoUpdater.on('update-not-available', (info) => {
+            console.log('无需更新');
+        });
+        autoUpdater.on('update-downloaded', (info) => {
+            mainWin.webContents.send('downloaded');
+            // 下载完成后强制用户安装
+            autoUpdater.quitAndInstall();
+        });
+    }
     win.loadFile('index.html')
-    if(!app.isPackaged)
-        win.webContents.openDevTools()
     if (store.get('isWindowAlwaysOnTop', true))
         win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
 }
@@ -81,15 +114,9 @@ ipcMain.on('getWeekIndex', (e, arg) => {
             click: () => {
                 dialog.showMessageBox(win, {
                     title: '授权信息',
-                    message: 'v0.1.1 测试版本不稳定，升级请联系作者\n\nBy ZianTT\nOriginal Author: EnderWolf006\nOriginal Project Link: https://github.com/EnderWolf006/ElectronClassSchedule\nLicense: GPL-3.0\n\n本程序授权给：'+store.get('licenseName', '未授权'),
+                    message: 'v1.1.1 测试版本不稳定，升级请联系作者\n\nBy ZianTT\nOriginal Author: EnderWolf006\nOriginal Project Link: https://github.com/EnderWolf006/ElectronClassSchedule\nLicense: GPL-3.0\n\n本程序授权给：'+store.get('licenseName', '未授权'),
                     buttons: ['确定']
                 })
-            }
-        },
-        {
-            label: '调试',
-            click: () => {
-                win.webContents.openDevTools()
             }
         },
         {
@@ -104,37 +131,6 @@ ipcMain.on('getWeekIndex', (e, arg) => {
         },
         {
             type: 'separator'
-        },
-        {
-            id: 'countdown',
-            label: '课上计时',
-            type: 'checkbox',
-            checked: store.get('isDuringClassCountdown', true),
-            click: (e) => {
-                store.set('isDuringClassCountdown', e.checked)
-                win.webContents.send('ClassCountdown', e.checked)
-            }
-        },
-        {
-            label: '窗口置顶',
-            type: 'checkbox',
-            checked: store.get('isWindowAlwaysOnTop', true),
-            click: (e) => {
-                store.set('isWindowAlwaysOnTop', e.checked)
-                if (store.get('isWindowAlwaysOnTop', true))
-                    win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
-                else
-                    win.setAlwaysOnTop(false)
-            }
-        },
-        {
-            label: '上课隐藏',
-            type: 'checkbox',
-            checked: store.get('isDuringClassHidden', true),
-            click: (e) => {
-                store.set('isDuringClassHidden', e.checked)
-                win.webContents.send('ClassHidden', e.checked)
-            }
         },
         {
             label: '开机启动',
@@ -186,10 +182,41 @@ ipcMain.on('setIgnore', (e, arg) => {
         win.setIgnoreMouseEvents(false);
 })
 
+ipcMain.on('checkTop', (e, arg) => {
+    if (store.get('isWindowAlwaysOnTop', true) && win.isAlwaysOnTop() === false)
+        win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
+})
+
+ipcMain.on('swconfig', (e, arg) => {
+    if (arg.type === 'ontop') {
+        store.set('isWindowAlwaysOnTop', arg.value)
+        if (store.get('isWindowAlwaysOnTop', true))
+            win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
+        else
+            win.setAlwaysOnTop(false)
+    }
+    if (arg.type === 'minimize') {
+        store.set('isDuringClassHidden', arg.value)
+        win.webContents.send('ClassHidden', arg.value)
+    }
+    if (arg.type === 'count') {
+        store.set('isDuringClassCountdown', arg.value)
+        win.webContents.send('ClassCountdown', arg.value)
+    }
+})
+
+ipcMain.on('update', (e, arg) => {
+    autoUpdater.checkForUpdates()
+})
+
 ipcMain.on('dialog', (e, arg) => {
     dialog.showMessageBox(win, arg.options).then((data) => {
         e.reply(arg.reply, { 'arg': arg, 'index': data.response })
     })
+})
+
+ipcMain.on('alert', (e, arg) => {
+    dialog.showMessageBox(win, arg.options)
 })
 
 ipcMain.on('pop', (e, arg) => {
@@ -267,9 +294,4 @@ ipcMain.on('getLicense', (e, arg) => {
             
         }
     })
-})
-
-ipcMain.on('checkTop', (e, arg) => {
-    if (store.get('isWindowAlwaysOnTop', true) && win.isAlwaysOnTop() === false)
-        win.setAlwaysOnTop(true, 'screen-saver', 9999999999999)
 })

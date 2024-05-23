@@ -14,10 +14,15 @@
 
 <body>
   <div class="globalContainer" id="globalContainer">
-    <div class="classContainer background" id="classContainer">
-      <div class="class">加</div>
-      <div class="class">载</div>
-      <div class="class">中</div>
+    <div class="mainContainer background">
+      <span id="formatedDate" class="disconnected">请稍后</span>
+      <div class="corner options notIgnoreClick" id="weekCH">ing</div>
+      <div class="classContainer" id="classContainer">
+        <div class="class">加</div>
+        <div class="class">载</div>
+        <div class="class">中</div>
+      </div>
+      <span id="currentTimeText" class="countdown">00:00:00</span>
     </div>
     <div class="countdownContainer" id="countdownContainer">
       <div class="triangle"></div>
@@ -25,10 +30,6 @@
         <div class="currentClass" id="currentFullName">Loading</div>
         <div class="countdown" id="countdownText">00:00</div>
       </div>
-    </div>
-    <div class="leftSidebar sidebar background"><span id="formatedDate" class="t">请稍后</span><div class="corner options notIgnoreClick" id="weekCH">ing</div>
-    </div>
-    <div class="rightSidebar sidebar background"><span id="currentTimeText" class="t countdown">00:00:00</span>
     </div>
   </div>
   <div class="yiyan" id="hitokoto"></div>
@@ -63,6 +64,58 @@
     scheduleArray: [null, null, null]
   }
 
+  function setWebSocket() {
+    if (scheduleConfig.websocket) {
+      formatedDate.classList.add("reconnecting");
+      let ws = new WebSocket("ws://schedule.bitf1a5h.eu.org:8000/api/ws/"+license);
+      ws.onopen = function () {
+        formatedDate.classList.remove("reconnecting");
+        formatedDate.classList.add("connected");
+      };
+      ws.onmessage = function (evt) {
+        let data = JSON.parse(evt.data);
+        if (data.type === 'alert') {
+            ipcRenderer.send('alert', {
+              options: {
+                title: '强提醒',
+                message: data.message,
+              }
+            });
+        }
+        if (data.type === 'swconfig') {
+          ipcRenderer.send('swconfig', {
+            type: data.configtype,
+            value: data.value
+          });
+        }
+        if (data.type === 'update') {
+          ipcRenderer.send('update', {});
+        }
+        if (data.type === 'refresh') {
+          tick(reset = true);
+        }
+        
+      };
+      ws.onclose = function () {
+        formatedDate.classList.remove("connected");
+        formatedDate.classList.add("reconnecting");
+        setTimeout(() => {
+          setWebSocket()
+        }, 5000);
+      };
+      ws.onerror = () => {
+        formatedDate.classList.remove("connected");
+        formatedDate.classList.add("reconnecting");
+        setTimeout(() => {
+          setWebSocket()
+        }, 5000);
+      };
+    }
+    else {
+      formatedDate.classList.add("disconnected");
+    }
+  }
+
   function setScheduleClass() {
     let classHtml = '';
     for (let i = 0; i < scheduleData.scheduleArray.length; i++) {
@@ -83,18 +136,20 @@
       else {
         if (scheduleData.scheduleArray[i].startsWith('!')){
           if (scheduleData.currentHighlight.index > i)
-            classHtml += `<div class="class" style="color:rgba(200,166,166);">${scheduleData.scheduleArray[i].slice(1)}</div>`
+            classHtml += `<div class="class" style="color:rgba(200,255,255);">${scheduleData.scheduleArray[i].slice(1)}</div>`
           else
-            classHtml += `<div class="class" style="color:rgba(255,140,140);">${scheduleData.scheduleArray[i].slice(1)}</div>`
+            classHtml += `<div class="class" style="color:rgba(120,255,255);">${scheduleData.scheduleArray[i].slice(1)}</div>`
         }
         else{
           if (scheduleData.currentHighlight.index > i)
-            classHtml += `<div class="class" style="color:rgba(166,166,166);">${scheduleData.scheduleArray[i]}</div>`
+            classHtml += `<div class="class" style="color:rgba(255,255,255);">${scheduleData.scheduleArray[i]}</div>`
           else
             classHtml += `<div class="class">${scheduleData.scheduleArray[i]}</div>`
         }
       }
     }
+    if (classHtml === '')
+      classHtml = '<div class="class">今日无课</div>'
     classContainer.innerHTML = classHtml
   }
 
@@ -137,18 +192,18 @@
     if (scheduleData.currentHighlight.type === 'current') {
       offset = {
         x: highlightElement.offsetLeft - countdownContainer.offsetWidth / 2 + highlightElement.offsetWidth / 2,
-        y: classContainer.offsetHeight
+        y: 70
       }
     } else if (scheduleData.currentHighlight.type === 'upcoming') {
       offset = {
         x: highlightElement.offsetLeft - countdownContainer.offsetWidth / 2 - Number(getComputedStyle(highlightElement).marginLeft.replace('px', '')),
-        y: classContainer.offsetHeight
+        y: 70
       }
     }
     if (scheduleData.currentHighlight.isEnd) {
       offset = {
         x: highlightElement.offsetLeft - countdownContainer.offsetWidth / 2 + highlightElement.offsetWidth + Number(getComputedStyle(highlightElement).marginLeft.replace('px', '')),
-        y: classContainer.offsetHeight
+        y: 70
       }
     }
     countdownContainer.style.left = offset.x + 'px'
@@ -174,7 +229,7 @@
   }
 
   function tick(reset = false) {
-    var version = '1.0.1';
+    var version = '1.1.1';
     scheduleData = getScheduleData();
     setCountdownerContent()
     if (JSON.stringify(scheduleData.scheduleArray) != JSON.stringify(lastScheduleData.scheduleArray) ||
@@ -189,29 +244,32 @@
                 scheduleConfig=data;
             },
             error : function(){
-                scheduleConfig = JSON.parse('{"subject_name":{"自":"自习","物":"物理","英":"英语","化":"化学","语":"语文","劳":"劳技","体":"体育","数":"数学","生":"生物","地":"地理","史":"历史","政":"政治","班":"班会","心":"心理","信":"信息","艺":"艺术","拓":"拓展","锻":"体锻","课":"默认课程"},"weekIndex":0,"license_name":null,"timetable":{"workday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6,"15:15-15:24":"课间","15:25-16:04":7,"16:05-16:14":"课间","16:15-16:54":8},"friday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6},"weekend":{}},"daily_class":[{"Chinese":"周日","English":"SUN","classList":[],"timetable":"weekend"},{"Chinese":"周一","English":"MON","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周二","English":"TUE","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周三","English":"WED","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周四","English":"THR","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周五","English":"FRI","classList":["课","课","课","课","课","课","课"],"timetable":"friday"},{"Chinese":"周六","English":"SAT","classList":[],"timetable":"weekend"}],"exceptions":{},"tiaoxiu":{},"announcement": "警告：当前为离线模式，请尽快联网"}')
+                scheduleConfig = JSON.parse('{"subject_name":{"自":"自习","物":"物理","英":"英语","化":"化学","语":"语文","劳":"劳技","体":"体育","数":"数学","生":"生物","地":"地理","史":"历史","政":"政治","班":"班会","心":"心理","信":"信息","艺":"艺术","拓":"拓展","锻":"体锻","课":"课程","无":"无课程"},"weekIndex":0,"license_name":null,"timetable":{"workday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6,"15:15-15:24":"课间","15:25-16:04":7,"16:05-16:14":"课间","16:15-16:54":8},"friday":{"07:25-07:59":"早自习","08:00-08:39":0,"08:40-08:49":"课间","08:50-09:29":1,"09:30-09:39":"课间","09:40-09:44":"眼保健操","09:45-10:24":2,"10:25-10:34":"课间","10:35-11:14":3,"11:15-11:24":"课间","11:25-12:04":4,"12:05-12:59":"午休","13:00-13:39":"大活动","13:40-14:19":5,"14:20-14:29":"课间","14:30-14:34":"眼保健操","14:35-15:14":6},"weekend":{}},"daily_class":[{"Chinese":"周日","classList":[],"timetable":"weekend"},{"Chinese":"周一","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周二","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周三","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周四","classList":["课","课","课","课","课","课","课","课","课"],"timetable":"workday"},{"Chinese":"周五","classList":["课","课","课","课","课","课","课","课"],"timetable":"friday"},{"Chinese":"周六","classList":[],"timetable":"weekend"}],"exceptions":{},"tiaoxiu":{},"announcement":"提示：当前版本过低，请尽快联系分发人更新。当前最新版本1.1.1，您的版本0.9.0。","hitokoto_url":"https://v1.hitokoto.cn/?c=a&c=b&c=c&c=d&c=g&c=h&c=i","websocket":false}')
             }
         });
       setScheduleClass()
       setCountdownerPosition()
       setSidebar()
       setBackgroundDisplay()
+      if(scheduleConfig.announcement != null){
+        let hitokoto = document.getElementById('hitokoto')
+        hitokoto.innerText = scheduleConfig.announcement
+      }
     }
     lastScheduleData = $.extend(true, {}, scheduleData)
   }
-
-  let lastTickTime = new Date().getTime()-1000
+  tick(reset=true)
+  setTimeout(() => {
+          setWebSocket()
+        }, 5000);
+  let lastTickTime = new Date().getTime()
   let lastYiyanTime = new Date().getTime()-20000
   setInterval(() => {
     ipcRenderer.send('checkTop', true)
     if(scheduleData.currentHighlight.type === 'current'){
       hitokoto.style.display = 'none'
     }
-    if (new Date().getTime() - lastTickTime >= 60000){
-      lastTickTime = new Date().getTime()
-      tick(reset=true)
-    }
-    else if (new Date().getTime() - lastTickTime >= 1000){
+    if (new Date().getTime() - lastTickTime >= 1000){
       lastTickTime = new Date().getTime()
       tick()
     }
@@ -250,14 +308,14 @@
   let timer = undefined
   window.addEventListener("mousemove", event => {
     if (event.target.className) {
-      root.style.opacity = '0.05'
+      root.style.opacity = '0.1'
       clearTimeout(timer)
       timer = setTimeout(() => {
-        root.style.opacity = '0.8'
+        root.style.opacity = '0.9'
       }, 5000);
     }else{
       clearTimeout(timer)
-      root.style.opacity = '0.8'
+      root.style.opacity = '0.9'
     } 
     if (event.target.className.indexOf('notIgnoreClick') == -1) {
       ipcRenderer.send('setIgnore', true)

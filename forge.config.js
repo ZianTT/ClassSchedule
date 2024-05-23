@@ -7,13 +7,10 @@ module.exports = {
   },
   rebuildConfig: {},
   makers: [
-    // {
-    //   name: '@electron-forge/maker-squirrel',
-    //   config: {
-    //     certificateFile: './cert.pfx',
-    //     certificatePassword: '1145141919810'
-    //   }
-    // },
+    {
+      name: '@electron-forge/maker-squirrel',
+      config: {},
+    },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
@@ -26,13 +23,6 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {},
     },
-    {
-      name: '@electron-forge/maker-wix',
-      config: {
-        language: 2052,
-        manufacturer: 'ZianTT',
-      }
-    }
   ],
   plugins: [
     {

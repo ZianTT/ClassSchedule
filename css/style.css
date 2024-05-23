@@ -45,33 +45,40 @@
         '--top-space': '16px', // 课表主体最顶端与电脑屏幕上边框的间隔长度
         '--main-horizontal-space': '8px', // 中间课表中的课程简写单字之间的间隔长度
     } */
-    --center-font-size: 46px;
+    --center-font-size: 36px;
     --corner-font-size: 24px;
     --countdown-font-size: 28px;
     --global-border-radius: 16px;
-    --global-bg-opacity: 0.6;
-    --container-bg-padding: 8px 14px;
+    --global-bg-opacity: 0.9;
+    --container-bg-padding: 12px 14px;
     --countdown-bg-padding: 5px 12px;
-    --container-space: 12px;
+    --container-space: 10px;
     --top-space: 44px;
-    --main-horizontal-space: 8px;
+    --main-horizontal-space: 10px;
 }
 
 .background {
     border-radius: var(--global-border-radius);
-    background-color: rgba(0, 0, 0, var(--global-bg-opacity));
+    background-color: rgba(140, 140, 140, var(--global-bg-opacity));
     padding: var(--container-bg-padding);
     font-size: var(--center-font-size);
     font-weight: 600;
 }
 
-.classContainer {
-    font-family: YouYuan;
+.mainContainer {
     position: relative;
     display: flex;
     flex-direction: row;
     justify-content: space-around;
     width: auto;
+}
+
+.classContainer {
+    font-weight: 500;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    margin: 0 30px;
 }
 
 .globalContainer {
@@ -88,11 +95,13 @@
 
 .current {
     color: rgba(0, 255, 10, 1);
+    font-weight: bold;
 }
 
 .upcoming {
     color: rgba(0, 255, 10, 1);
     animation: highlightUpcoming 1.5s;
+    font-weight: bold;
     animation-iteration-count: infinite;
 }
 
@@ -111,6 +120,43 @@
 
 }
 
+
+.disconnected {
+    color: rgba(255, 255, 255, 1);
+    font-weight: bold;
+}
+
+.connected {
+    color: rgba(0, 255, 10, 1);
+    font-weight: bold;
+    animation-iteration-count: infinite;
+}
+
+.reconnecting {
+    color: rgb(255, 0, 0);
+    animation: reconnecting 1.2s;
+    font-weight: bold;
+    animation-iteration-count: infinite;
+}
+
+
+@keyframes reconnecting {
+    0% {
+        color: rgb(255, 0, 0);
+    }
+
+    50% {
+        color: rgb(250, 255, 0);
+    }
+
+    100% {
+        color: rgb(255, 0, 0);
+    }
+
+}
+
+
+
 .sidebar {
     /* height: 100%; */
     position: absolute;
@@ -118,21 +164,8 @@
     font-family: Ali;
 }
 
-.rightSidebar {
-    right: 0;
-    color: #3ae1ff;
-    transform: translateX(calc(100% + var(--container-space)));
-}
-
-.leftSidebar {
-    left: 0;
-    color: rgb(0, 238, 255);
-    transform: translateX(calc(-100% - var(--container-space)));
-}
-
 .corner {
     display: inline;
-    font-size: var(--corner-font-size);
     color: rgba(255, 255, 255, 1);
     font-family: SourceHanSansCN-Bold;
 }
@@ -147,14 +180,14 @@
     height: 0;
     border-style: solid;
     border-width: 0 16px 16px;
-    border-color: transparent transparent rgba(0, 0, 0, var(--global-bg-opacity));
+    border-color: transparent transparent rgba(140, 140, 140, var(--global-bg-opacity));
     position: relative;
     left: 50%;
     transform: translateX(-50%);
 }
 
 .countdowner {
-    background-color: rgba(0, 0, 0, var(--global-bg-opacity));
+    background-color: rgba(140, 140, 140, var(--global-bg-opacity));
     border-radius: var(--global-border-radius);
     padding: var(--countdown-bg-padding);
     font-size: var(--countdown-font-size);
@@ -183,7 +216,7 @@
     transform: translateX(-50%);
     top: 6px;
     border-radius: var(--global-border-radius);
-    background-color: rgba(0, 0, 0, var(--global-bg-opacity));
+    background-color: rgba(140, 140, 140, var(--global-bg-opacity));
     padding: var(--countdown-bg-padding);
     font-size: 20px;
     color: #FFF;
@@ -193,9 +226,9 @@
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    top: 8px;
+    top: 2px;
     border-radius: var(--global-border-radius);
-    background-color: rgba(0, 0, 0, var(--global-bg-opacity));
+    background-color: rgba(140, 140, 140, var(--global-bg-opacity));
     padding: var(--countdown-bg-padding);
     font-size: var(--countdown-font-size);
     font-family: JetB;
