@@ -1,5 +1,10 @@
 if(require('electron-squirrel-startup')) return;
 const { app, BrowserWindow, Menu, ipcMain, dialog, screen, Tray, shell, net, autoUpdater } = require('electron')
+const Sentry = require("@sentry/electron/main");
+
+Sentry.init({
+  dsn: "https://11ed10917af88c3c5fea9733e23d5dcb@o4504797893951488.ingest.us.sentry.io/4507306374070272",
+});
 const path = require('path');
 const fs = require('fs')
 const os = require('os')
@@ -10,11 +15,7 @@ const Store = require('electron-store');
 const { DisableMinimize } = require('electron-disable-minimize');
 const store = new Store();
 
-import * as Sentry from "@sentry/electron";
 
-Sentry.init({
-  dsn: "https://11ed10917af88c3c5fea9733e23d5dcb@o4504797893951488.ingest.us.sentry.io/4507306374070272",
-});
 
 let tray = undefined;
 let form = undefined;
